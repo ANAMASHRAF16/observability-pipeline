@@ -1,0 +1,90 @@
+{
+  "widgets": [
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 0,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "title": "Throughput (orders/min)",
+        "view": "timeSeries",
+        "stacked": false,
+        "metrics": [
+          ["OrderPipeline", "OrdersProcessed", "Environment", "dev", { "label": "Processed", "stat": "Sum" }],
+          [".", "OrdersFailed", ".", ".", { "label": "Failed", "stat": "Sum" }]
+        ],
+        "period": 60,
+        "region": "us-east-1"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 0,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "title": "Failure Rate (%)",
+        "view": "timeSeries",
+        "stacked": false,
+        "metrics": [
+          [{ "expression": "100 * failed / (processed + failed)", "label": "Failure Rate %", "id": "fr" }],
+          ["OrderPipeline", "OrdersProcessed", "Environment", "dev", { "id": "processed", "stat": "Sum", "visible": false }],
+          [".", "OrdersFailed", ".", ".", { "id": "failed", "stat": "Sum", "visible": false }]
+        ],
+        "period": 300,
+        "region": "us-east-1",
+        "yAxis": { "left": { "min": 0, "max": 100 } },
+        "annotations": {
+          "horizontal": [
+            { "label": "Alarm threshold", "value": 10 }
+          ]
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 6,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "title": "Processing Latency (ms)",
+        "view": "timeSeries",
+        "stacked": false,
+        "metrics": [
+          ["OrderPipeline", "ProcessingLatency", "Environment", "dev", { "label": "p50", "stat": "p50" }],
+          ["...", { "label": "p99", "stat": "p99" }],
+          ["...", { "label": "Max", "stat": "Maximum" }]
+        ],
+        "period": 60,
+        "region": "us-east-1",
+        "annotations": {
+          "horizontal": [
+            { "label": "p99 alarm threshold", "value": 500 }
+          ]
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 6,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "title": "Failures by ErrorType",
+        "view": "timeSeries",
+        "stacked": true,
+        "metrics": [
+          ["OrderPipeline", "OrdersFailed", "Environment", "dev", "ErrorType", "missing_user", { "stat": "Sum" }],
+          ["...", "invalid_amount_type", { "stat": "Sum" }],
+          ["...", "non_positive_amount", { "stat": "Sum" }]
+        ],
+        "period": 300,
+        "region": "us-east-1"
+      }
+    }
+  ]
+}
