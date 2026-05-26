@@ -31,7 +31,7 @@
         "metrics": [
           [{ "expression": "100 * failed / (processed + failed)", "label": "Failure Rate %", "id": "fr" }],
           ["OrderPipeline", "OrdersProcessed", "Environment", "dev", { "id": "processed", "stat": "Sum", "visible": false }],
-          [".", "OrdersFailed", ".", ".", { "id": "failed", "stat": "Sum", "visible": false }]
+          [{ "expression": "SUM(SEARCH('{OrderPipeline,Environment,ErrorType} MetricName=\"OrdersFailed\"', 'Sum', 300))", "id": "failed", "visible": false }]
         ],
         "period": 300,
         "region": "us-east-1",
