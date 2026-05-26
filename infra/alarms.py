@@ -64,16 +64,14 @@ def create_high_failure_rate_alarm():
                 "ReturnData": False,
             },
             {
+                # Aggregate OrdersFailed across all ErrorType dimension values.
+                # The metric is published with Environment + ErrorType dimensions,
+                # so a single-dimension MetricStat query (only Environment) finds
+                # nothing and returns 0 - making failure_rate stuck at 0%.
+                # SEARCH sums every ErrorType variant under Environment=<env>.
                 "Id": "failed",
-                "MetricStat": {
-                    "Metric": {
-                        "Namespace": NAMESPACE,
-                        "MetricName": "OrdersFailed",
-                        "Dimensions": env_dim(),
-                    },
-                    "Period": 300,
-                    "Stat": "Sum",
-                },
+                "Expression": "SUM(SEARCH('{" + NAMESPACE + ",Environment,ErrorType} MetricName=\"OrdersFailed\" Environment=\"" + ENVIRONMENT + "\"', 'Sum', 300))",
+                "Label": "Failed (all error types)",
                 "ReturnData": False,
             },
         ],
@@ -90,7 +88,6 @@ def create_high_latency_alarm():
         Namespace=NAMESPACE,
         MetricName="ProcessingLatency",
         Dimensions=env_dim(),
-        Statistic="Average",
         ExtendedStatistic="p99",
         Period=300,
         EvaluationPeriods=1,
