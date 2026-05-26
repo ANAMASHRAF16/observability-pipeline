@@ -32,7 +32,41 @@ def alarm_actions():
     return [SNS_TOPIC_ARN] if SNS_TOPIC_ARN else []
 
 
+# Known ErrorType values published by src/pipeline_fixed.py. Keeping this
+# as a fixed enum (not raw exception strings) is the cost-bounded design
+# choice from PR 1 - and it also lets the alarm enumerate them explicitly
+# below, since CloudWatch alarms do NOT support SEARCH expressions
+# (only dashboards do). If a new ErrorType is added to the pipeline,
+# add it here too.
+ERROR_TYPES = ["missing_user", "invalid_amount_type", "non_positive_amount", "unexpected"]
+
+
+def _failed_metric_stat(error_type_value: str, metric_id: str) -> dict:
+    """One MetricStat block matching OrdersFailed for a specific ErrorType."""
+    return {
+        "Id": metric_id,
+        "MetricStat": {
+            "Metric": {
+                "Namespace": NAMESPACE,
+                "MetricName": "OrdersFailed",
+                "Dimensions": env_dim() + [{"Name": "ErrorType", "Value": error_type_value}],
+            },
+            "Period": 300,
+            "Stat": "Sum",
+        },
+        "ReturnData": False,
+    }
+
+
 def create_high_failure_rate_alarm():
+    # CloudWatch alarms can't use SEARCH, so we query OrdersFailed once per
+    # known ErrorType and sum them with FILL(_, 0) to treat missing data as 0.
+    failed_ids = [f"f{i}" for i in range(len(ERROR_TYPES))]
+    failed_metric_stats = [
+        _failed_metric_stat(et, fid) for et, fid in zip(ERROR_TYPES, failed_ids)
+    ]
+    sum_failed = " + ".join(f"FILL({fid}, 0)" for fid in failed_ids)
+
     cw.put_metric_alarm(
         AlarmName=f"{NAMESPACE}-HighFailureRate",
         AlarmDescription="Failure rate exceeded 10% over 5 minutes",
@@ -46,7 +80,7 @@ def create_high_failure_rate_alarm():
         Metrics=[
             {
                 "Id": "failure_rate",
-                "Expression": "failed / (processed + failed)",
+                "Expression": f"({sum_failed}) / (FILL(processed, 0) + ({sum_failed}))",
                 "Label": "Failure Rate",
                 "ReturnData": True,
             },
@@ -63,17 +97,7 @@ def create_high_failure_rate_alarm():
                 },
                 "ReturnData": False,
             },
-            {
-                # Aggregate OrdersFailed across all ErrorType dimension values.
-                # The metric is published with Environment + ErrorType dimensions,
-                # so a single-dimension MetricStat query (only Environment) finds
-                # nothing and returns 0 - making failure_rate stuck at 0%.
-                # SEARCH sums every ErrorType variant under Environment=<env>.
-                "Id": "failed",
-                "Expression": "SUM(SEARCH('{" + NAMESPACE + ",Environment,ErrorType} MetricName=\"OrdersFailed\" Environment=\"" + ENVIRONMENT + "\"', 'Sum', 300))",
-                "Label": "Failed (all error types)",
-                "ReturnData": False,
-            },
+            *failed_metric_stats,
         ],
     )
     print(f"  created {NAMESPACE}-HighFailureRate")
